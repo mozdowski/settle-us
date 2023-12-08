@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+
+pragma solidity ^0.8.19;
 
 error NotOwner();
 error NotGroupMember();
@@ -34,11 +35,12 @@ contract SettleGroup {
     constructor(
         string memory _groupName,
         uint256 _minEntryAmountEth,
+        address ownerAddress,
         string memory _ownerName
     ) {
         groupName = _groupName;
-        createActiveUser(_ownerName, msg.sender);
-        i_owner = msg.sender;
+        createActiveUser(_ownerName, ownerAddress);
+        i_owner = ownerAddress;
         minEntryAmount = _minEntryAmountEth * 1 ether;
     }
 
@@ -135,6 +137,15 @@ contract SettleGroup {
 
     function getGroupName() public view returns (string memory) {
         return groupName;
+    }
+
+    function getOwner()
+        public
+        view
+        returns (address ownerAddress, string memory ownerName)
+    {
+        ownerAddress = i_owner;
+        ownerName = users[i_owner].name;
     }
 
     fallback() external payable {

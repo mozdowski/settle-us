@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+
+pragma solidity ^0.8.19;
 
 import "./SettleGroup.sol";
 
 contract SettleUs {
     address[] groups;
-    mapping(address => address[]) userGroups;
-    mapping(address => address[]) userInvitations;
+    mapping(address => address[]) s_userGroups;
+    mapping(address => address[]) s_userInvitations;
 
     function createNewGroup(
         string memory _groupName,
@@ -16,20 +17,21 @@ contract SettleUs {
         SettleGroup group = new SettleGroup(
             _groupName,
             _minEntryAmountEth,
+            msg.sender,
             _ownerName
         );
 
         address createdGroupAddr = address(group);
-        userGroups[msg.sender].push(createdGroupAddr);
+        s_userGroups[msg.sender].push(createdGroupAddr);
 
         return createdGroupAddr;
     }
 
     function getMyGroups() public view returns (address[] memory) {
-        return userGroups[msg.sender];
+        return s_userGroups[msg.sender];
     }
 
     function getMyGroupInvitations() public view returns (address[] memory) {
-        return userInvitations[msg.sender];
+        return s_userInvitations[msg.sender];
     }
 }
