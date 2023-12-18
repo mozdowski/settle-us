@@ -13,8 +13,12 @@ contract SettleUs {
         string memory _groupName,
         uint256 _minEntryAmountEth,
         string memory _ownerName
-    ) public returns (address) {
-        SettleGroup group = new SettleGroup(
+    ) public payable returns (address) {
+        if (msg.value < _minEntryAmountEth) {
+            revert InsufficientFunds();
+        }
+
+        SettleGroup group = new SettleGroup{value: msg.value}(
             _groupName,
             _minEntryAmountEth,
             msg.sender,

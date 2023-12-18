@@ -4,6 +4,9 @@ pragma solidity ^0.8.19;
 
 error NotOwner();
 error NotGroupMember();
+error NotInvited();
+error InsufficientFunds();
+error InsufficientFundsOrInactiveUser(string message);
 
 contract SettleGroup {
     struct User {
@@ -22,7 +25,7 @@ contract SettleGroup {
     }
 
     string groupName;
-    address[] usersAddresses;
+    address[] public usersAddresses;
     uint256 public immutable minEntryAmount;
     address immutable i_owner;
 
@@ -37,11 +40,15 @@ contract SettleGroup {
         uint256 _minEntryAmountEth,
         address ownerAddress,
         string memory _ownerName
-    ) {
+    ) payable {
+        if (msg.value < _minEntryAmountEth) {
+            revert InsufficientFunds();
+        }
+
         groupName = _groupName;
-        createActiveUser(_ownerName, ownerAddress);
+        createActiveUser(_ownerName, ownerAddress, msg.value);
         i_owner = ownerAddress;
-        minEntryAmount = _minEntryAmountEth * 1 ether;
+        minEntryAmount = _minEntryAmountEth;
     }
 
     modifier onlyOwner() {
@@ -55,7 +62,7 @@ contract SettleGroup {
     }
 
     modifier onlyActiveMembers() {
-        if (users[msg.sender].isActive) revert NotGroupMember();
+        if (!users[msg.sender].isActive) revert NotGroupMember();
         _;
     }
 
@@ -64,20 +71,20 @@ contract SettleGroup {
     }
 
     function join(string memory _username) public {
-        require(
-            invitations[msg.sender],
-            "You have not been invited to this group"
-        );
+        if (!invitations[msg.sender]) {
+            revert NotInvited();
+        }
         createInactiveUser(_username, msg.sender);
     }
 
     function addFunds() public payable onlyMembers {
         User storage payer = users[msg.sender];
 
-        require(
-            msg.value >= minEntryAmount || payer.isActive,
-            "Insufficient ETH sent. If you are inactive user, you have to pay minimal entry amount"
-        );
+        if (!payer.isActive && msg.value < minEntryAmount) {
+            revert InsufficientFundsOrInactiveUser(
+                "Inactive user must pay the minimal entry amount"
+            );
+        }
 
         payer.balance += msg.value;
 
@@ -98,14 +105,14 @@ contract SettleGroup {
         });
 
         uint256 numberOfUsers = usersAddresses.length;
-        uint256 amoutPerPerson = _amount / numberOfUsers;
+        uint256 amountPerPerson = _amount / numberOfUsers;
 
         users[msg.sender].balance += _amount;
 
         for (uint i = 0; i < numberOfUsers; i++) {
             User storage user = users[usersAddresses[i]];
             user.transactionIds.push(transactionCounter);
-            user.balance -= amoutPerPerson;
+            user.balance -= amountPerPerson;
         }
 
         transactionCounter++;
@@ -118,6 +125,7 @@ contract SettleGroup {
                 ""
             );
             require(callSuccess, "Withdrawal failed");
+            user.balance = 0;
         }
     }
 
@@ -128,8 +136,12 @@ contract SettleGroup {
         usersAddresses.push(_addr);
     }
 
-    function createActiveUser(string memory _name, address _addr) internal {
-        User memory user = User(new uint256[](0), _name, _addr, 0, true);
+    function createActiveUser(
+        string memory _name,
+        address _addr,
+        uint256 balance
+    ) internal {
+        User memory user = User(new uint256[](0), _name, _addr, balance, true);
         users[_addr] = user;
 
         usersAddresses.push(_addr);
@@ -146,6 +158,16 @@ contract SettleGroup {
     {
         ownerAddress = i_owner;
         ownerName = users[i_owner].name;
+    }
+
+    function getMyDetails() public view onlyMembers returns (User memory) {
+        return users[msg.sender];
+    }
+
+    function getTransactionDetailsByTransactionId(
+        uint transactionId
+    ) public view onlyActiveMembers returns (Transaction memory) {
+        return transactions[transactionId];
     }
 
     fallback() external payable {
